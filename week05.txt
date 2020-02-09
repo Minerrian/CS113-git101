@@ -1,0 +1,42 @@
+1.function call and stack frame
+*pop เอาค่าออก push เอาค่าเข้า
+	-Frame Pointers ฟังก์ชัน
+	-โดยทั่วไป ฟังก์ชันมีขั้นตอนวิธีการจัดเก็บ ตัวแปรพารามิเตอร์ที่รับข้อมูลเข้ามา, ตัวแปร local, และบางกรณียังมีตัวแปรที่ไว้ถูกใช้งานโดยชั่วครา
+	-บริเวณที่เก็บตัวแปรเหล่าเรียกว่า stack frame ซึ่งถูกจัดเก็บอยู่ภายใน stack ของ process
+	-frame pointer: Intel x86 architectures ใช้รีจิสเตอร์ ebp (ใน 64-bit architectures ใช้รีจสเตอร์ rbp) 
+                        ในการจัดเก็บค่าของ frame pointer ซึ่งเป็น base address ของ function frame
+	-ภายในฟังก์ชัน โค้ดที่ใช้เข้าถึงตัวแปร local ต่างๆ จะถูกกำหนดให้อยู่ในรูปของ offset จาก frame pointer
+	-stack pointer: Intel x86 architectures ใช้รีจิสเตอร์ esp (ใน 64-bit architectures ใช้รีจสเตอร์ rsp) 
+                        ในการจัดเก็บค่าของ stack pointer ซึ่งมีการเปลี่ยนแปลงค่าในช่วงที่ฟังก์ชันทำงาน ซึ่งมีการ push และ pop ค่าใน stack
+	-Frame pointer จะไม่มีการเปลี่ยนแปลงค่าในช่วงการทำงานของฟังก์ชัน
+
+
+	- สิ่งที่เกิดขึ้นในช่วงการทำงานของฟังก์ชัน
+	        -ค่าใน frame pointer (ebp/rbp) ถูก push ลงใน stack เพื่อให้เราสามารถนำค่าของมันกลับมาในภายหลัง
+           -move ค่าที่อยู่ใน stack pointer ไปใส่ใน frame pointer เพื่อเป็นการกำหนดจุดเริ่มต้นของ frame
+                             -ลบค่าออกจาก stack pointer ตามขนาดที่ฟังก์ชันต้องการใช้ในการเก็บข้อมูล ****(stack โตจาก high memory ไปยัง low memory)****  
+                                ดังนั้นการลบค่านี้จะช่วยป้องกันพื้นที่ที่ใช้เก็บข้อมูลของฟังก์ชันจากการ push ข้อมูลใหม่ลงไปใน stack
+                             -คำสั่ง call จะ push ตำแหน่งของ return address ลงใน stack ก่อนที่จะเรียกใช้ฟังก์ชัน
+                             -โค้ดของฟังก์ชันเริ่มทำงาน โดยที่การอ้างอิงไปยังค่าตัวแปร local จะเป็นการใช้ negative offset ออกจาก frame pointer  (ต.ย. movl $123, -8(%rbp))
+                             -เมื่อฟังก์ชันสิ้นสุดการทำงาน จะมีการ copy ค่าของ frame pointer ไปลงใน stack pointer เพื่อเคลียร์พื้นที่ที่ใช้ไปใน stack frame 
+                                แล้วหลังจากนั้นจึง pop ค่าเก่าของ frame pointer กลับมาด้วยการใช้คำสั่ง “leave”
+                             -กลับจากการเรียกใช้ฟังก์ชันด้วยการใช้คำสั่ง “ret”  ซึ่งจะทำการ pop ค่า return address ออกจาก stack แล้วจึงย้ายการทำงานกลับไปยังจุดเรียกใช้ฟังก์ชัน
+
+2.การสร้าง Static Library
+     gcc -c func.c 
+     ar cr libfunc.a func.o
+
+3. การสร้าง Shared (Dynamic) Library
+
+        Windows: gcc -shared -o libfunc.dll -Wl,--out-implib,libfunc.dll.a *.o
+
+        MacOSX: gcc -shared -o libfunc.dylib *.o
+
+        Linux: gcc -shared -o libfunc.so *.o
+
+4. การเรียกใช้ฟังก์ชันใน Shared Library ของภาษา C จาก Python
+     from ctypes import cdll
+
+     c_lib = cdll.LoadLibrary("libfunc.dll")
+
+     c_lib.c_function(123)
